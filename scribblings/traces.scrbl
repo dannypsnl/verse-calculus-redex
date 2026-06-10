@@ -5,7 +5,11 @@
 This part teaches the calculus by example.  Each chapter collects a
 machine-checked trace of one paper derivation, walking through it step by
 step, with every figure — reduction diagrams and per-step typesetting —
-generated from the Redex model when the manual is built.
+generated from the Redex model when the manual is built.  In every diagram,
+each node shows the paper notation above its s-expression form, and gray
+@tt{↪} stubs mark the other rules that could legally fire at that state.
+Each path starts from @racket[(one _)] wrapping the program, exactly as
+@racket[run] does (Fig 1: a program is evaluated under @racket[one]).
 
 @local-table-of-contents[]
 
