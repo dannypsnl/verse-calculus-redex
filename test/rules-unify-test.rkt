@@ -14,8 +14,14 @@
 ;; same-arity tuples ever succeed). Regression for hnf-clash? on equal ops.
 (test--> vc--> (term (seq (eqn add add) done)) (term fail)) ; U-FAIL (add=add)
 (test--> vc--> (term (seq (eqn add gt) done)) (term fail)) ; U-FAIL (add=gt)
-;; U-FAIL: a lambda fails unification against itself, too (paper §4.3)
-(test--> vc--> (term (seq (eqn (lam x x) (lam x x)) done)) (term fail)) ; U-FAIL (λ=λ)
+;; NOT U-FAIL: a lambda against any value — including itself — is STUCK, never
+;; fail. Equality of functions is undecidable, so U-FAIL excludes lambdas
+;; (paper Fig 3 side condition; §3.2 "it gets stuck if you attempt to unify a
+;; lambda with any other value, including itself"). A bare term with no expected
+;; successor asserts the redex is stuck.
+(test--> vc--> (term (seq (eqn (lam x x) (lam x x)) done))) ; STUCK (λ=λ)
+(test--> vc--> (term (seq (eqn (lam x x) 5) done))) ; STUCK (λ=value)
+(test--> vc--> (term (seq (eqn 5 (lam x x)) done))) ; STUCK (value=λ)
 ;; U-OCCURS: x = ⟨x⟩; e -> fail
 (test--> vc--> (term (seq (eqn x (tup x)) done)) (term fail)) ; U-OCCURS
 ;; SUBST: x = 5 ; x  -->  x = 5 ; 5   (occurrence in continuation replaced)

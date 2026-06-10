@@ -91,11 +91,17 @@
                      [(hnf-clash? k_1 k_2) ,(not (= (term k_1) (term k_2)))]
                      [(hnf-clash? (tup v_1 ...) (tup v_2 ...))
                       ,(not (= (length (term (v_1 ...))) (length (term (v_2 ...)))))]
-                     ;; Everything else clashes — per the paper's U-FAIL, which fires
-                     ;; whenever U-LIT and U-TUP do not match. In particular an op or a
-                     ;; lambda fails unification against anything, INCLUDING an identical
-                     ;; one (add=add ⟶ fail, λ=λ ⟶ fail; paper §3.2 / §4.3): only U-LIT
-                     ;; (k=k) and U-TUP (same-arity tuples) ever succeed.
+                     ;; A lambda against ANY value — another lambda, or itself — does NOT
+                     ;; clash: U-FAIL deliberately excludes it, so the equation gets STUCK
+                     ;; rather than failing. Equality of functions is undecidable, so VC
+                     ;; refuses to decide it (Fig 3 side condition "neither hnf1 nor hnf2
+                     ;; is a lambda"; §3.2: "it gets stuck if you attempt to unify a lambda
+                     ;; with any other value, including itself").
+                     [(hnf-clash? (lam x e) hnf) #f]
+                     [(hnf-clash? hnf (lam x e)) #f]
+                     ;; Any other mismatch of non-lambda head values clashes — U-LIT (k=k)
+                     ;; and U-TUP (same-arity tuples) are the only successes, so e.g. add=gt,
+                     ;; add=add, and 3=⟨1⟩ all fail (Fig 3 U-FAIL fires when U-LIT/U-TUP miss).
                      [(hnf-clash? hnf_1 hnf_2) #t])
 
 ;; ⟨v_1..⟩ = ⟨v_1'..⟩ ; e   ==>   v_1 = v_1' ; ... ; e   (equal arity assumed)
