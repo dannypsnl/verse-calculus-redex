@@ -1,6 +1,7 @@
 #lang racket/base
 (require redex/reduction-semantics "grammar.rkt" racket/list)
-(provide fvs var< subst-ok? hnf-clash? unify-tup index-choices flat-choice seq-swap-ok?)
+(provide fvs var< subst-ok? hnf-clash? unify-tup index-choices flat-choice seq-swap-ok?
+         current-var-depths binder-depths)
 
 (define-metafunction VC
                      fvs : any -> (x ...)
@@ -19,26 +20,66 @@
                      [(fvs (one e)) (fvs e)]
                      [(fvs (all e)) (fvs e)])
 
-;; Total order on variables, approximating the paper's x ≺ y ("x is bound
-;; inside y"). Freshly-introduced binders (α-renamed by Redex, whose printed
-;; names carry a non-alphanumeric marker such as «0») are INNER binders, so
-;; they sort before plain source variables — i.e. the innermost variable ends
-;; up on the left of an equation, which is what keeps VAR-SWAP/SUBST from
-;; ping-ponging AND lets EQN-ELIM fire. Among same-class names we fall back to
-;; lexical order. (A fully faithful ≺ is binding-context-dependent; this is the
-;; documented heuristic used by the implementation — see the design's known
-;; soft-spot note.)
+;; The paper's variable order x ≺ y means "x is bound inside y" (paper §3.3:
+;; var-swap fires on y=x only if x is bound inside y, so the INNERMOST-bound
+;; variable ends up on the left). That order is genuinely binding-context-
+;; dependent, so it cannot be decided from two bare names alone.
+;;
+;; `binder-depths` recovers it from the whole term: each ∃/λ-bound variable
+;; gets its nesting depth (the outermost binder is 1, deeper binders are
+;; larger; for a shadowed name we keep the innermost = largest depth). A
+;; deeper binder is "more inside", hence smaller under ≺. `current-var-depths`
+;; carries that map down to `var<`; the stepper sets it (refreshed per step) so
+;; traces orient equations exactly as the paper does. When it is unset (the
+;; `run`/`vc-eval` exhaustive path, where confluence makes orientation
+;; irrelevant) every variable reads as depth 0 and we fall back to the original
+;; name heuristic — preserving the established `run` behavior.
+(define current-var-depths (make-parameter #f))
+
+;; whole-term map: bound variable name -> innermost nesting depth (1-based)
+(define (binder-depths t)
+  (define h (make-hash))
+  (let walk ([t t] [d 0])
+    (when (pair? t)
+      (case (car t)
+        [(exists lam)
+         (define x (cadr t))
+         (define d* (add1 d))
+         (hash-update! h x (lambda (old) (max old d*)) d*)
+         (walk (caddr t) d*)]
+        [else (for-each (lambda (s) (walk s d)) (cdr t))])))
+  h)
+
+;; The original name-based heuristic, used only as a same-depth tiebreak (and
+;; as the whole order on the depth-less `run` path): α-renamed/fresh names
+;; (whose printed form carries a non-alphanumeric marker such as «0») sort as
+;; inner, then lexical order. This keeps the relation a deterministic TOTAL
+;; order, so VAR-SWAP/SEQ-SWAP cannot ping-pong.
+(define (heuristic<? a b)
+  (let* ([s1 (symbol->string a)]
+         [s2 (symbol->string b)]
+         [f1 (regexp-match? #rx"[^a-zA-Z0-9]" s1)]
+         [f2 (regexp-match? #rx"[^a-zA-Z0-9]" s2)])
+    (cond
+      [(and f1 (not f2)) #t]
+      [(and (not f1) f2) #f]
+      [else (string<? s1 s2)])))
+
+;; x ≺ y, decided lexicographically on (depth descending, then heuristic):
+;; deeper binder ⇒ more inside ⇒ smaller. A bound variable (depth ≥ 1) is thus
+;; ≺ a free/ambient one (depth 0). Total + antisymmetric ⇒ no swap loops.
+(define (var<? a b)
+  (define dm (current-var-depths))
+  (define da (if dm (hash-ref dm a 0) 0))
+  (define db (if dm (hash-ref dm b 0) 0))
+  (cond
+    [(> da db) #t]
+    [(< da db) #f]
+    [else (heuristic<? a b)]))
+
 (define-metafunction VC
                      var< : x x -> boolean
-                     [(var< x_1 x_2)
-                      ,(let* ([s1 (symbol->string (term x_1))]
-                              [s2 (symbol->string (term x_2))]
-                              [f1 (regexp-match? #rx"[^a-zA-Z0-9]" s1)]
-                              [f2 (regexp-match? #rx"[^a-zA-Z0-9]" s2)])
-                         (cond
-                           [(and f1 (not f2)) #t] ; x_1 fresh/inner, x_2 plain/outer  => x_1 < x_2
-                           [(and (not f1) f2) #f] ; x_1 plain/outer, x_2 fresh/inner  => not <
-                           [else (string<? s1 s2)]))])
+                     [(var< x_1 x_2) ,(var<? (term x_1) (term x_2))])
 
 (define-metafunction VC
                      subst-ok? : x v -> boolean

@@ -1,13 +1,21 @@
 #lang racket/base
 (require redex/reduction-semantics
          "eval.rkt"
+         "metafns.rkt"
          "pretty.rkt")
 (provide step steps run trace print-steps)
 
-;; step: one-step successors as (name . term) pairs (uses the apply-anywhere relation)
+;; step: one-step successors as (name . term) pairs (uses the apply-anywhere
+;; relation). We bind `current-var-depths` to THIS term's binder nesting so the
+;; ordering rules (VAR-SWAP/SEQ-SWAP/SUBST) orient equations innermost-on-left,
+;; exactly as the paper's ≺ does — refreshed every step because reductions move
+;; binders (EXI-SWAP/EXI-FLOAT). Redex memoizes metafunctions, and `var<` now
+;; depends on this parameter, so caching is disabled for the duration.
 (define (step t)
-  (for/list ([nt (in-list (apply-reduction-relation/tag-with-names vc-eval t))])
-    (cons (car nt) (cadr nt))))
+  (parameterize ([current-var-depths (binder-depths t)]
+                 [caching-enabled? #f])
+    (for/list ([nt (in-list (apply-reduction-relation/tag-with-names vc-eval t))])
+      (cons (car nt) (cadr nt)))))
 
 ;; steps: greedily follow the first successor until a normal form; return it.
 (define (steps t [fuel 10000])
