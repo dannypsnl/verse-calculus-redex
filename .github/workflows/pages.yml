@@ -1,0 +1,66 @@
+name: Deploy docs to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow the GITHUB_TOKEN to deploy to Pages and verify the deployment origin.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Render Scribble manual
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Bogdanp/setup-racket@v1.15
+        with:
+          architecture: x64
+          distribution: full
+          variant: CS
+          version: stable
+      - name: Install verse-calculus-redex and its dependencies
+        run: raco pkg install --no-docs --auto --name verse-calculus-redex
+      - name: Render the manual to HTML
+        # The figures are typeset from the live Redex model, so the package must
+        # be installed first. ++main-xref-in + --redirect-main make cross-doc
+        # links point at docs.racket-lang.org instead of dangling locally.
+        run: |
+          raco scribble \
+            --htmls \
+            --dest site \
+            ++main-xref-in \
+            --redirect-main https://docs.racket-lang.org/ \
+            scribblings/verse-calculus-redex.scrbl
+      - name: Add a root redirect to the manual
+        run: |
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=verse-calculus-redex/index.html">
+          <title>verse-calculus-redex</title>
+          <a href="verse-calculus-redex/index.html">verse-calculus-redex documentation</a>
+          EOF
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
