@@ -9,8 +9,7 @@
 ;; relation). We bind `current-var-depths` to THIS term's binder nesting so the
 ;; ordering rules (VAR-SWAP/SEQ-SWAP/SUBST) orient equations innermost-on-left,
 ;; exactly as the paper's ≺ does — refreshed every step because reductions move
-;; binders (EXI-SWAP/EXI-FLOAT). Redex memoizes metafunctions, and `var<` now
-;; depends on this parameter, so caching is disabled for the duration.
+;; binders (EXI-SWAP/EXI-FLOAT).
 (define (step t)
   (parameterize ([current-var-depths (binder-depths t)]
                  [caching-enabled? #f])

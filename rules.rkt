@@ -68,10 +68,8 @@
                       (--> (one (choose v e)) v "ONE-CHOICE")
                       (--> (all fail) (tup) "ALL-FAIL")
                       (--> (all v) (tup v) "ALL-VALUE")
-                      ;; all-choice: all{v1 | ··· | vn} → ⟨v1,···,vn⟩ (n ≥ 2). The
-                      ;; (choose ...) shape gives n ≥ 2 (disjoint from ALL-VALUE);
-                      ;; flat-choice returns #f unless every leaf is a value, so the
-                      ;; `where` fires only on a fully-reduced choice of values.
+                      ;; all-choice: all{v1 | ··· | vn} → ⟨v1,···,vn⟩ (n ≥ 2; the
+                      ;; (choose ...) shape keeps it disjoint from ALL-VALUE)
                       (--> (all (choose e_1 e_2)) (tup v ...)
                            (where (v ...) (flat-choice (choose e_1 e_2))) "ALL-CHOICE")
                       (--> (choose fail e) e "CHOOSE-R")

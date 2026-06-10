@@ -23,17 +23,8 @@
 ;; The paper's variable order x ≺ y means "x is bound inside y" (paper §3.3:
 ;; var-swap fires on y=x only if x is bound inside y, so the INNERMOST-bound
 ;; variable ends up on the left). That order is genuinely binding-context-
-;; dependent, so it cannot be decided from two bare names alone.
-;;
-;; `binder-depths` recovers it from the whole term: each ∃/λ-bound variable
-;; gets its nesting depth (the outermost binder is 1, deeper binders are
-;; larger; for a shadowed name we keep the innermost = largest depth). A
-;; deeper binder is "more inside", hence smaller under ≺. `current-var-depths`
-;; carries that map down to `var<`; the stepper sets it (refreshed per step) so
-;; traces orient equations exactly as the paper does. When it is unset (the
-;; `run`/`vc-eval` exhaustive path, where confluence makes orientation
-;; irrelevant) every variable reads as depth 0 and we fall back to the original
-;; name heuristic — preserving the established `run` behavior.
+;; dependent, so it cannot be decided from two bare names alone. We approximate
+;; it by binder nesting depth, falling back to a name heuristic when unset.
 (define current-var-depths (make-parameter #f))
 
 ;; whole-term map: bound variable name -> innermost nesting depth (1-based)
@@ -50,11 +41,7 @@
         [else (for-each (lambda (s) (walk s d)) (cdr t))])))
   h)
 
-;; The original name-based heuristic, used only as a same-depth tiebreak (and
-;; as the whole order on the depth-less `run` path): α-renamed/fresh names
-;; (whose printed form carries a non-alphanumeric marker such as «0») sort as
-;; inner, then lexical order. This keeps the relation a deterministic TOTAL
-;; order, so VAR-SWAP/SEQ-SWAP cannot ping-pong.
+;; name-based tiebreak when depths are equal
 (define (heuristic<? a b)
   (let* ([s1 (symbol->string a)]
          [s2 (symbol->string b)]
@@ -65,9 +52,6 @@
       [(and (not f1) f2) #f]
       [else (string<? s1 s2)])))
 
-;; x ≺ y, decided lexicographically on (depth descending, then heuristic):
-;; deeper binder ⇒ more inside ⇒ smaller. A bound variable (depth ≥ 1) is thus
-;; ≺ a free/ambient one (depth 0). Total + antisymmetric ⇒ no swap loops.
 (define (var<? a b)
   (define dm (current-var-depths))
   (define da (if dm (hash-ref dm a 0) 0))
@@ -120,12 +104,9 @@
                               (index-choices x (v_1 ...) ,(add1 (term k))))])
 
 ;; flat-choice : e -> (v ...) or #f
-;; Recognizes ALL-CHOICE's `v1 | ··· | vn` (Fig 3, all-choice): returns the list
-;; of values when e is a right-nested choice of values, and #f otherwise — so a
-;; `where (v ...) (flat-choice e)` guard rules ALL-CHOICE out unless every leaf
-;; is already a value. (The paper writes this with an ellipsis; there is no
-;; `vchoice` nonterminal in Fig 1/4, so we keep the recursion here in the rule
-;; machinery rather than inventing a grammar category.)
+;; Recognizes ALL-CHOICE's `v1 | ··· | vn` (Fig 3, all-choice). The paper writes
+;; this as an ellipsis with no nonterminal (no `vchoice` in Fig 1/4), so we
+;; encode it here in the rule machinery rather than as a grammar category.
 (define-metafunction VC
                      flat-choice : e -> any
                      [(flat-choice v) (v)]
