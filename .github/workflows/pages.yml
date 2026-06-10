@@ -41,18 +41,11 @@ jobs:
             ++main-xref-in \
             --redirect-main https://docs.racket-lang.org/ \
             scribblings/verse-calculus-redex.scrbl
-      - name: Add a root redirect to the manual
-        run: |
-          cat > site/index.html <<'EOF'
-          <!doctype html>
-          <meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=verse-calculus-redex/index.html">
-          <title>verse-calculus-redex</title>
-          <a href="verse-calculus-redex/index.html">verse-calculus-redex documentation</a>
-          EOF
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          # --htmls nests output under a doc-named subdir; publish that as the
+          # site root so the manual's index.html lands at the top level.
+          path: site/verse-calculus-redex
 
   deploy:
     name: Deploy to GitHub Pages
