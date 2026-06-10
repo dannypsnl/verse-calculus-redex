@@ -17,7 +17,7 @@
                     (choose e e) ; e1 | e2
                     (one e) ; one{e}
                     (all e)) ; all{e}
-                 (p ::= e) ; program (closed)
+                 (p ::= (one e)) ; program: one{e}, e closed (Fig 1)
                  (x y z f g ::= variable-not-otherwise-mentioned)
 
                  ;; ---- Fig 4: contexts ----
@@ -25,11 +25,9 @@
                  (V ::= hole (tup v ... V v ...)) ; value
                  (SX ::= (one SC) (all SC)) ; scope
                  (SC ::= hole (choose e SC) (choose SC e)) ; Fig 4: □ | SC e | e SC (choice nav only; seq/∃/eqn nav is CX's job)
-                 (CX ::= hole (seq (eqn v CX) e) (seq CX e) (seq ce CX) (exists x CX)) ; choice
+                 (CX ::= hole (seq (eqn v CX) e) (seq CX e) (seq ceq CX) (exists x CX)) ; choice
                  (ce ::= v (seq ceq ce) (one e) (all e) (exists x ce) (app op v)) ; choice-free
                  (ceq ::= ce (eqn v ce))
-                 ;; right-nested choice of values (for ALL-CHOICE)
-                 (vchoice ::= v (choose v vchoice))
 
                  #:binding-forms
                  (lam x e #:refers-to x)

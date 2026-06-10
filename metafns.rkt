@@ -113,12 +113,19 @@
                       (choose (seq (eqn x k) v_0)
                               (index-choices x (v_1 ...) ,(add1 (term k))))])
 
-;; right-nested value choice -> the list of its values
+;; flat-choice : e -> (v ...) or #f
+;; Recognizes ALL-CHOICE's `v1 | ··· | vn` (Fig 3, all-choice): returns the list
+;; of values when e is a right-nested choice of values, and #f otherwise — so a
+;; `where (v ...) (flat-choice e)` guard rules ALL-CHOICE out unless every leaf
+;; is already a value. (The paper writes this with an ellipsis; there is no
+;; `vchoice` nonterminal in Fig 1/4, so we keep the recursion here in the rule
+;; machinery rather than inventing a grammar category.)
 (define-metafunction VC
-                     flat-choice : vchoice -> (v ...)
+                     flat-choice : e -> any
                      [(flat-choice v) (v)]
-                     [(flat-choice (choose v vchoice)) (v v_1 ...)
-                      (where (v_1 ...) (flat-choice vchoice))])
+                     [(flat-choice (choose v e)) (v v_1 ...)
+                      (where (v_1 ...) (flat-choice e))]
+                     [(flat-choice e) #f])
 
 ;; SEQ-SWAP must not fire when the left item is an equation y=v' with y <= x,
 ;; otherwise it would loop against SUBST/VAR-SWAP ordering.

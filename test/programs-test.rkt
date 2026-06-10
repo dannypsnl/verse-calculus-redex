@@ -1,11 +1,16 @@
 #lang racket/base
 (require redex/reduction-semantics
          "../grammar.rkt"
+         "../metafns.rkt"
          "../traces/programs.rkt")
 
-;; Every example program must be a well-formed VC program (nonterminal p).
+;; Each example is a program BODY (a closed e); one{body} is the program p
+;; (Fig 1: p ::= one{e}, fvs(e)=∅). Check both: the wrapped form is a well-
+;; formed p, and the body is actually closed.
 (define-syntax-rule (check-program prog)
-  (test-equal (and (redex-match VC p prog) #t) #t))
+  (begin
+    (test-equal (and (redex-match VC p (term (one ,prog))) #t) #t)
+    (test-equal (term (fvs ,prog)) '())))
 
 (check-program opening)
 (check-program first-apply)
